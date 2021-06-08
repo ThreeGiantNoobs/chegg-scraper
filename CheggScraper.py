@@ -1,5 +1,4 @@
 import os
-
 import requests
 import logging
 
@@ -26,7 +25,7 @@ class CheggScraper(object):
             'sec-fetch-user': '?1',
             'sec-fetch-dest': 'document',
             'accept-language': 'en-US,en;q=0.9',
-            'cookie': cookie,
+            'cookie': self.cookie,
         }
         logging.debug(f'self.cookie = {self.cookie}')
 
@@ -60,3 +59,4 @@ class CheggScraper(object):
                           note: str = None, error_note: str = "Error in request"):
         response = self.web_response(url, headers, expected_status, note, error_note)
         return response.text
+
