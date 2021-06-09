@@ -2,12 +2,33 @@
 
 
 
+Download Chegg homework-help questions to html files, these html files are self sufficient, you don't need account access to load them
+
+<details open>
+    <summary>Details</summary>
+    <li>
+		All files are saved to html document.
+    </li>
+    <li>
+        You will not need you chegg account to open these files later.
+    </li>
+    <li>
+        (Optional) It's preferred to have internet access to load css, and some js. [preffer to host files eg: localhost or someOtherDomain]
+    </li>
+</details>
+
+
 ## USE-CASES
 
-* #### CAN BE USED IN BOTS
 
-* #### Saving Chegg Questions Locally
+* <details>
+    <summary style='bold'>In Bots</summary>
+    <l1>
+        You can share your chegg subscription with your friends, eg: by making discord bot
+    </l1>
+    </details> 
 
+* Saving Chegg Questions Locally
 
 
 ## Setup:
@@ -68,9 +89,10 @@
   ALL ARGUMENTS ARE OPTIONAL
   -u or -url      >   URL of Chegg
   -c or -cookie   >   Path of Cookie file (Defualt: cookie.txt)
+  -s or -save     >   file path, where you want to save, put inside " "
   ```
-
   
-
   
+  
+   
 

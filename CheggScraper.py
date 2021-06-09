@@ -39,7 +39,7 @@ class CheggScraper(object):
 
         logging.debug(f'self.cookie = {self.cookie}')
 
-        self.DFID = self.cookie_dict.get('DFID')
+        self.deviceFingerPrintId = self.cookie_dict.get('DFID')
 
     @staticmethod
     def slugify(value, allow_unicode=False):
@@ -67,7 +67,7 @@ class CheggScraper(object):
         return html_template
 
     @staticmethod
-    def replace_src_links(html_text):
+    def replace_src_links(html_text: str):
         return re.sub(r'src=\s*?"//(.*)?"', r'src="https://\1"', html_text)
 
     @staticmethod
@@ -87,6 +87,7 @@ class CheggScraper(object):
             data = json.loads(json_string)
             return True, data
         except Exception as e:
+            logging.critical(msg=f'while parsing json: {e}')
             return False, None
 
     @staticmethod
@@ -101,7 +102,7 @@ class CheggScraper(object):
         return cookie_str
 
     @staticmethod
-    def parse_cookie(cookie_path):
+    def parse_cookie(cookie_path: str):
         if os.path.exists(cookie_path):
             if os.path.isfile(cookie_path):
                 with open(cookie_path, 'r') as f:
@@ -118,7 +119,15 @@ class CheggScraper(object):
             logging.error(msg=f"{cookie_path} don't exist")
             raise Exception
 
-    def final_touch(self, html_text):
+    @staticmethod
+    def clean_url(url: str) -> str:
+        match = re.search(r'chegg\.com/homework-help/questions-and-answers/[^?/]+', url)
+        if not match:
+            logging.error(f'THIS URL NOT SUPPORTED\nurl: {url}')
+            raise Exception(f'THIS URL NOT SUPPORTED\nurl: {url}')
+        return 'https://www.' + match.group(0)
+
+    def final_touch(self, html_text: str):
         soup = BeautifulSoup(html_text, 'lxml')
         if soup.find('div', {'id': 'show-more'}):
             soup.find('div', {'id': 'show-more'}).decompose()
@@ -153,35 +162,9 @@ class CheggScraper(object):
         response = self.web_response(url, headers, expected_status, note, error_note)
         return response.json()
 
-    def _parse(self, html_text) -> (str, str):
-        html_text = self.replace_src_links(html_text)
-        soup = BeautifulSoup(html_text, 'lxml')
-        token = re.search(r'"token":"(.+?)"', html_text).group(1)
-        logging.debug("HTML\n\n" + html_text + "HTML\n\n")
-        to_load_enhanced_content = False
-        if soup.find('div', {'id': 'enhanced-content'}).find('div', {'class': 'chg-load'}):
-            to_load_enhanced_content = True
-
-        """Parse headers"""
-        headers = soup.find('head')
-
-        """Parse heading"""
-        heading = None
-        heading_tag = soup.find('span', _class='question-text')
-        if heading_tag:
-            heading = heading_tag.text
-        if not heading:
-            meta_description = soup.find('meta', {'name': 'description'})
-            if meta_description:
-                heading = meta_description.get('content')
-        if not heading:
-            logging.error(msg="can't able to get heading")
-        else:
-            logging.info(msg=f"Heading: {heading}")
-
-        """Parse Question"""
-        """Type1: class = ugc-base question-body-text"""
-
+    @staticmethod
+    def _parse_question(soup: BeautifulSoup):
+        # # This Parse Question If not Login
         # question_data = None
         # _question_data = None
         # __question_data = re.search(
@@ -199,14 +182,17 @@ class CheggScraper(object):
         #     logging.error(msg="can't able to get question")
         #     raise Exception("can't able to parse question, ERROR")
 
-        question_div = soup.find('div', {'class': 'question-body-text'})
-        if question_div:
-            # question type 1:
-            ...
-        # TODO: ADD SUPPORT FOR ALL TYPES QUESTION
+        return soup.find('div', {'class': 'question-body-text'})
 
-        """Parse Answer"""
-        # answers_list_ul = soup.find('ul', {'class': 'answers-list'})
+    def _parse_answer(self, soup, html_text):
+        token = re.search(r'"token":"(.+?)"', html_text).group(1)
+
+        to_load_enhanced_content = False
+        enhanced_content_div = soup.find('div', {'id': 'enhanced-content'})
+        if enhanced_content_div:
+            if enhanced_content_div.find('div', {'class': 'chg-load'}):
+                to_load_enhanced_content = True
+
         _, question_data = self.parse_json(re.search(r'C.page.homeworkhelp_question\((.*)?\);', html_text).group(1))
 
         questionUuid = question_data['question']['questionUuid']
@@ -215,10 +201,46 @@ class CheggScraper(object):
             _s_ = [str(x) for x in answers_list_li]
             answers__ = '<ul class="answers-list">' + "".join(_s_) + "</ul>"
         elif to_load_enhanced_content:
-            content_request_url = f"https://www.chegg.com/study/_ajax/enhancedcontent?token={token}&questionUuid={questionUuid}&showOnboarding=&templateName=ENHANCED_CONTENT_V2&deviceFingerPrintId={self.DFID}"
-            answers__ = '<div id="enhanced-content"><hr>' + self.get_response_dict(url=content_request_url)['enhancedContentMarkup'] + "</div>"
+            content_request_url = f"https://www.chegg.com/study/_ajax/enhancedcontent?token={token}&questionUuid={questionUuid}&showOnboarding=&templateName=ENHANCED_CONTENT_V2&deviceFingerPrintId={self.deviceFingerPrintId}"
+            answers__ = '<div id="enhanced-content"><hr>' + self.get_response_dict(url=content_request_url)[
+                'enhancedContentMarkup'] + "</div>"
         else:
             raise Exception
+
+        return answers__
+
+    @staticmethod
+    def _parse_heading(soup):
+        heading = None
+        heading_tag = soup.find('span', _class='question-text')
+        if heading_tag:
+            heading = heading_tag.text
+        if not heading:
+            meta_description = soup.find('meta', {'name': 'description'})
+            if meta_description:
+                heading = meta_description.get('content')
+        if not heading:
+            logging.error(msg="can't able to get heading")
+        else:
+            logging.info(msg=f"Heading: {heading}")
+        return heading
+
+    def _parse(self, html_text: str) -> (str, str):
+        html_text = self.replace_src_links(html_text)
+        soup = BeautifulSoup(html_text, 'lxml')
+        logging.debug("HTML\n\n" + html_text + "HTML\n\n")
+
+        """Parse headers"""
+        headers = soup.find('head')
+
+        """Parse heading"""
+        heading = self._parse_heading(soup)
+
+        """Parse Question"""
+        question_div = self._parse_question(soup)
+
+        """Parse Answer"""
+        answers__ = self._parse_answer(soup, html_text)
 
         response = self.render_html(
             headers=headers,
@@ -233,12 +255,17 @@ class CheggScraper(object):
         return response, heading
 
     def url_to_html(self, url: str, file_path: str = None):
+        url = self.clean_url(url)
 
         html_res_text = self.get_response_text(url=url)
         final_html, heading = self._parse(html_text=html_res_text)
 
+        heading = self.slugify(heading.strip('.').strip())
+
         if not file_path:
-            file_path = self.slugify(heading.strip('.').strip()) + '.html'
+            file_path = heading + '.html'
+
+        file_path = file_path.format(**{'heading': heading})
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(final_html)
