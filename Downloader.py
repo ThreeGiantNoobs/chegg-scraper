@@ -1,4 +1,6 @@
 import argparse
+import re
+
 from CheggScraper import CheggScraper
 
 ap = argparse.ArgumentParser()
@@ -10,11 +12,9 @@ args = vars(ap.parse_args())
 
 
 if __name__ == '__main__':
-    # if args.get('cookie_file') == 'cookie.txt':
-    #     print('Cookie file as cookie.txt')
     if not args.get('url'):
         args.update({'url': input('Enter url of the homework-help: ')})
 
     Chegg = CheggScraper(cookie_path=args['cookie_file'])
     # print(Chegg.download_to_pdf2(url=args['url']))
-    Chegg._parse(Chegg.get_response_text(args['url']))
+    print(Chegg.url_to_html(args['url']))

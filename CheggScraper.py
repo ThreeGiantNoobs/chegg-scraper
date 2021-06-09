@@ -1,18 +1,18 @@
 import os
 import json
 import re
+import unicodedata
 
 import requests
 import logging
 
 from bs4 import BeautifulSoup
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename='scraper.log', filemode='w', level=logging.INFO)
 # logging.basicConfig(level=logging.DEBUG)
 
 
 class CheggScraper(object):
-
     def __init__(self, cookie: str = None, cookie_path: str = None):
         if cookie:
             self.cookie = cookie
@@ -40,6 +40,16 @@ class CheggScraper(object):
         logging.debug(f'self.cookie = {self.cookie}')
 
         self.DFID = self.cookie_dict.get('DFID')
+
+    @staticmethod
+    def slugify(value, allow_unicode=False):
+        value = str(value)
+        if allow_unicode:
+            value = unicodedata.normalize('NFKC', value)
+        else:
+            value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+        value = re.sub(r'[^\w\s-]', '', value.lower())
+        return re.sub(r'[-\s]+', '-', value).strip('-_')
 
     @staticmethod
     def render_html(**kwargs):
@@ -143,14 +153,11 @@ class CheggScraper(object):
         response = self.web_response(url, headers, expected_status, note, error_note)
         return response.json()
 
-    def cookie_to_dict(self, c):
-        ...
-
-    def _parse(self, html_text):
+    def _parse(self, html_text) -> (str, str):
         html_text = self.replace_src_links(html_text)
         soup = BeautifulSoup(html_text, 'lxml')
         token = re.search(r'"token":"(.+?)"', html_text).group(1)
-        print(html_text)
+        logging.debug("HTML\n\n" + html_text + "HTML\n\n")
         to_load_enhanced_content = False
         if soup.find('div', {'id': 'enhanced-content'}).find('div', {'class': 'chg-load'}):
             to_load_enhanced_content = True
@@ -223,12 +230,22 @@ class CheggScraper(object):
 
         response = self.final_touch(html_text=response)
 
-        with open(f'{heading}.html', 'w', encoding='utf-8') as f:
-            f.write(response)
-        return response
+        return response, heading
+
+    def url_to_html(self, url: str, file_path: str = None):
+
+        html_res_text = self.get_response_text(url=url)
+        final_html, heading = self._parse(html_text=html_res_text)
+
+        if not file_path:
+            file_path = self.slugify(heading.strip('.').strip()) + '.html'
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(final_html)
+
+        return file_path
 
 
 if __name__ == '__main__':
     pass
     # print()
-
