@@ -1,1 +1,0 @@
-# chegg-scaraper
