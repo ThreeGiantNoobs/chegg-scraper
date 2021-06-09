@@ -26,7 +26,7 @@
       </ul>
       <ul>
           <li>Grab your cookies by typing </li>
-          <code>document.txt</code>
+          <code>document.cookie</code>
       </ul>
       <ul>
           <li>paste yout cookie from console into cookie.txt (without <code>"</code>)</li>
