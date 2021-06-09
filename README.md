@@ -52,6 +52,8 @@
 
 ## Usage:
 
+* If you are new to python go [here](NOOB.md)
+
 * Run the `Downloader.py` Script
 
   ```console
