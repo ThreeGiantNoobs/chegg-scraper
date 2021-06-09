@@ -127,4 +127,16 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#
+cookie.txt
 .idea
+cookie.json
+*.pdf
+*.html
+
+
+
+
+*
+!template.html
