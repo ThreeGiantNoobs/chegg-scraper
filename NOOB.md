@@ -1,6 +1,7 @@
 # Chegg-Scraper
 
 This scrapper can scrape through [Chegg.com](https://www.chegg.com) and create an html file to save the content locally.
+The repository can be used in Chegg-Scraping Bots or for downloading the webpage.
 ###How To Use ??
 First of all, download the latest release from [here](https://github.com/ThreeGiantNoobs/chegg-scraper/releases/latest)
 
