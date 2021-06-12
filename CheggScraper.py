@@ -1,15 +1,14 @@
 import os
-import json
 import re
-import unicodedata
-
+import json
 import requests
 import logging
+import unicodedata
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 
-logging.basicConfig(filename='scraper.log', filemode='w', level=logging.INFO)
-# logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(filename='scraper.log', filemode='w', level=logging.DEBUG)
 
 
 class CheggScraper(object):
@@ -21,13 +20,24 @@ class CheggScraper(object):
 
         self.cookie_dict = self.cookie_str_to_dict(self.cookie)
 
+        with open('conf.json', 'r') as f:
+            conf = json.load(f)
+        user_agent = conf.get('user_agent')
+        self.base_path = conf.get('base_path')
+        if not self.base_path:
+            self.base_path = ''
+
+        logging.debug(msg=f'user_agent: {user_agent}')
+        if not user_agent:
+            raise Exception('user_agent is None')
+
         self.headers = {
             'authority': 'www.chegg.com',
             'cache-control': 'max-age=0',
             'sec-ch-ua': '\\',
             'sec-ch-ua-mobile': '?0',
             'upgrade-insecure-requests': '1',
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36 Edg/91.0.864.37',
+            'user-agent': user_agent,
             'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
             'sec-fetch-site': 'none',
             'sec-fetch-mode': 'navigate',
@@ -36,6 +46,8 @@ class CheggScraper(object):
             'accept-language': 'en-US,en;q=0.9',
             'cookie': self.cookie,
         }
+
+        self.ajax_url = 'https://www.chegg.com/study/_ajax/enhancedcontent?token={token}&questionUuid={question_uuid}&showOnboarding=&templateName=ENHANCED_CONTENT_V2&deviceFingerPrintId={deviceFingerPrintId}'
 
         logging.debug(f'self.cookie = {self.cookie}')
 
@@ -121,13 +133,31 @@ class CheggScraper(object):
 
     @staticmethod
     def clean_url(url: str) -> str:
+        """
+        Cleans the url, So no track id goes to url
+
+        @param url: url of chegg webpage
+        @type url: str
+        @return: Url removed with trackId
+        @rtype: str
+        """
         match = re.search(r'chegg\.com/homework-help/questions-and-answers/[^?/]+', url)
         if not match:
             logging.error(f'THIS URL NOT SUPPORTED\nurl: {url}')
             raise Exception(f'THIS URL NOT SUPPORTED\nurl: {url}')
         return 'https://www.' + match.group(0)
 
-    def final_touch(self, html_text: str):
+    @staticmethod
+    def final_touch(html_text: str) -> str:
+        """
+        Final changes to final html code, like changing class of some divs
+
+        @param html_text: html text
+        @type html_text: str
+        @return: modified FINAL html Text
+        @rtype: str
+        """
+
         soup = BeautifulSoup(html_text, 'lxml')
         if soup.find('div', {'id': 'show-more'}):
             soup.find('div', {'id': 'show-more'}).decompose()
@@ -136,14 +166,14 @@ class CheggScraper(object):
 
         return str(soup)
 
-    def web_response(self, url: str, headers: dict = None, expected_status: tuple = (200,),
-                     note: str = None, error_note: str = "Error in request"):
+    def _web_response(self, url: str, headers: dict = None, expected_status: tuple = (200,),
+                      note: str = None, error_note: str = "Error in request"):
         if not headers:
             headers = self.headers
         response = requests.get(
             url=url,
-            headers=headers,
-        )
+            headers=headers)
+
         if response.status_code not in expected_status:
             logging.error(msg=f'Expected status code {expected_status} but got {response.status_code}\n{error_note}')
             return response
@@ -152,18 +182,26 @@ class CheggScraper(object):
                 logging.info(msg=note)
             return response
 
-    def get_response_text(self, url: str, headers: dict = None, expected_status: tuple = (200,),
-                          note: str = None, error_note: str = "Error in request"):
-        response = self.web_response(url, headers, expected_status, note, error_note)
+    def _get_response_text(self, url: str, headers: dict = None, expected_status: tuple = (200,),
+                           note: str = None, error_note: str = "Error in request"):
+        response = self._web_response(url, headers, expected_status, note, error_note)
         return response.text
 
-    def get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,),
-                          note: str = None, error_note: str = "Error in request"):
-        response = self.web_response(url, headers, expected_status, note, error_note)
+    def _get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,),
+                           note: str = None, error_note: str = "Error in request"):
+        response = self._web_response(url, headers, expected_status, note, error_note)
         return response.json()
 
     @staticmethod
-    def _parse_question(soup: BeautifulSoup):
+    def _parse_question(soup: BeautifulSoup) -> Tag:
+        """
+        Simply parse question
+
+        @param soup: BeautifulSoup from chegg_html
+        @type soup: BeautifulSoup
+        @return: div containing question
+        @rtype: Tag
+        """
         # # This Parse Question If not Login
         # question_data = None
         # _question_data = None
@@ -184,7 +222,19 @@ class CheggScraper(object):
 
         return soup.find('div', {'class': 'question-body-text'})
 
-    def _parse_answer(self, soup, html_text):
+    def _parse_answer(self, soup: BeautifulSoup, question_uuid: str, html_text: str) -> str:
+        """
+        Parse Answers as a div from soup
+
+        @param soup: BeautifulSoup from chegg_html
+        @type soup: BeautifulSoup
+        @param question_uuid: unique question id
+        @type question_uuid: str
+        @param html_text: chegg response text
+        @type html_text: str
+        @return: Div Containing div
+        @rtype: str
+        """
         token = re.search(r'"token":"(.+?)"', html_text).group(1)
 
         to_load_enhanced_content = False
@@ -193,24 +243,28 @@ class CheggScraper(object):
             if enhanced_content_div.find('div', {'class': 'chg-load'}):
                 to_load_enhanced_content = True
 
-        _, question_data = self.parse_json(re.search(r'C.page.homeworkhelp_question\((.*)?\);', html_text).group(1))
-
-        questionUuid = question_data['question']['questionUuid']
         answers_list_li = soup.findAll('div', {'class': 'answer-given-body'})
         if answers_list_li:
             _s_ = [str(x) for x in answers_list_li]
             answers__ = '<ul class="answers-list">' + "".join(_s_) + "</ul>"
         elif to_load_enhanced_content:
-            content_request_url = f"https://www.chegg.com/study/_ajax/enhancedcontent?token={token}&questionUuid={questionUuid}&showOnboarding=&templateName=ENHANCED_CONTENT_V2&deviceFingerPrintId={self.deviceFingerPrintId}"
-            answers__ = '<div id="enhanced-content"><hr>' + self.get_response_dict(url=content_request_url)[
-                'enhancedContentMarkup'] + "</div>"
+            content_request_url = self.ajax_url.format(question_uuid=question_uuid, token=token, deviceFingerPrintId=self.deviceFingerPrintId)
+            answers__ = '<div id="enhanced-content"><hr>' + self._get_response_dict(url=content_request_url)['enhancedContentMarkup'] + "</div>"
         else:
             raise Exception
 
         return answers__
 
     @staticmethod
-    def _parse_heading(soup):
+    def _parse_heading(soup: BeautifulSoup) -> str:
+        """
+        Parse heading from html
+
+        @param soup: BeautifulSoup from chegg_html
+        @type soup: BeautifulSoup
+        @return: heading of the question page
+        @rtype: str
+        """
         heading = None
         heading_tag = soup.find('span', _class='question-text')
         if heading_tag:
@@ -223,7 +277,7 @@ class CheggScraper(object):
             logging.error(msg="can't able to get heading")
         else:
             logging.info(msg=f"Heading: {heading}")
-        return heading
+        return str(heading)
 
     def _parse(self, html_text: str) -> (str, str):
         html_text = self.replace_src_links(html_text)
@@ -237,12 +291,38 @@ class CheggScraper(object):
         heading = self._parse_heading(soup)
 
         """Parse Question"""
+        _, question_data = self.parse_json(re.search(r'C\.page\.homeworkhelp_question\((.*)?\);', html_text).group(1))
+        logging.debug(msg=str(question_data))
+        if _:
+            questionUuid = question_data['question']['questionUuid']
+        else:
+            raise Exception('Unable to get question uuid')
+        
         question_div = self._parse_question(soup)
 
         """Parse Answer"""
-        answers__ = self._parse_answer(soup, html_text)
+        answers_div = self._parse_answer(soup, questionUuid, html_text)
 
-        response = self.render_html(
+        return headers, heading, question_div, answers_div, questionUuid
+
+    def url_to_html(self, url: str, file_path: str = None) -> str:
+        """
+        Chegg url to html file, saves the file and return file path
+
+        @param url: chegg url
+        @type url: str
+        @param file_path: File path to save file
+        @type file_path: str
+        @return: file_path
+        @rtype: str
+        """
+        url = self.clean_url(url)
+
+        html_res_text = self._get_response_text(url=url)
+
+        headers, heading, question_div, answers__, question_uuid = self._parse(html_text=html_res_text)
+
+        html_rendered_text = self.render_html(
             headers=headers,
             title=heading,
             heading=heading,
@@ -250,22 +330,21 @@ class CheggScraper(object):
             answers_wrap=answers__
         )
 
-        response = self.final_touch(html_text=response)
-
-        return response, heading
-
-    def url_to_html(self, url: str, file_path: str = None):
-        url = self.clean_url(url)
-
-        html_res_text = self.get_response_text(url=url)
-        final_html, heading = self._parse(html_text=html_res_text)
+        final_html = self.final_touch(html_text=html_rendered_text)
 
         heading = self.slugify(heading.strip('.').strip())
-
         if not file_path:
             file_path = heading + '.html'
 
-        file_path = file_path.format(**{'heading': heading})
+        file_path = os.path.join(
+            self.base_path,
+            file_path)
+
+        file_path = file_path.format(**{
+            'heading': heading,
+            'title': heading,
+            'question_uuid': question_uuid
+        })
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(final_html)
@@ -275,4 +354,3 @@ class CheggScraper(object):
 
 if __name__ == '__main__':
     pass
-    # print()

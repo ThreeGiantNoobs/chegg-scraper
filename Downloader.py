@@ -1,6 +1,5 @@
 import argparse
 import json
-import re
 
 from CheggScraper import CheggScraper
 

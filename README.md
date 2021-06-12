@@ -13,9 +13,10 @@ Download Chegg homework-help questions to html files, these html files are self 
         You will not need you chegg account to open these files later.
     </li>
     <li>
-        (Optional) It's preferred to have internet access to load css, and some js. [preffer to host files eg: localhost or someOtherDomain]
+        (Optional) It's preferred to have internet access to load css, and some js . [preffer to host files eg: localhost or someOtherDomain]
     </li>
 </details>
+
 
 
 ## USE-CASES
@@ -68,6 +69,20 @@ Download Chegg homework-help questions to html files, these html files are self 
           <li>Click Export and paste in cookie.txt</li>
       </ul>
   </details>
+
+* You may also need to change user-agent
+
+  * Open conf.json and edit user_agent
+
+    * Find your browser user agent
+
+      * Open [What's My User Agent](https://whatmyuseragent.com/) 
+
+        Or
+
+      * Open Browser console and run 
+
+        ``console.log(navigator.userAgent)``
 
 
 
