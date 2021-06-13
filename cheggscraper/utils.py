@@ -4,4 +4,3 @@ class ConfigNotFound(Exception):
         if not message:
             message = 'Config file not found'
         super(ConfigNotFound, self).__init__(message)
-    pass

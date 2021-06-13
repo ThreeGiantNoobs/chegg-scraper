@@ -14,7 +14,10 @@ from bs4.element import Tag
 logging.basicConfig(filename='scraper.log', filemode='w', level=logging.DEBUG)
 
 
-class CheggScraper(object):
+class CheggScraper:
+    """
+    Scrape html from chegg.com and store them in a way so you don't need cookie to view the file
+    """
     def __init__(self, cookie: str = None, cookie_path: str = None, user_agent: str = None, base_path: str = None,
                  save_file_path: str = None, config: dict = None, template_path: str = None):
         if cookie:
@@ -67,7 +70,17 @@ class CheggScraper(object):
         self.deviceFingerPrintId = self.cookie_dict.get('DFID')
 
     @staticmethod
-    def slugify(value, allow_unicode=False):
+    def slugify(value: str, allow_unicode: bool = False) -> str:
+        """
+        slugify the names of files
+
+        :param value: string to be slugify
+        :type value: str
+        :param allow_unicode: allow unicode
+        :type allow_unicode: bool
+        :return: string after slugify
+        :rtype: str
+        """
         value = str(value)
         if allow_unicode:
             value = unicodedata.normalize('NFKC', value)
@@ -76,8 +89,15 @@ class CheggScraper(object):
         value = re.sub(r'[^\w\s-]', '', value.lower())
         return re.sub(r'[-\s]+', '-', value).strip('-_')
 
-    def render_html(self, **kwargs):
+    def render_html(self, **kwargs) -> str:
+        """
+        render html from template file: {{var}}
 
+        :param kwargs: key, value to replace in template
+        :type kwargs:
+        :return: rendered html code
+        :rtype: str
+        """
         template_path = kwargs.get('template_path')
         html_template = None
         if not template_path:
@@ -90,18 +110,34 @@ class CheggScraper(object):
             with open(template_path, 'r') as f:
                 html_template = f.read()
 
-
         variables = re.findall(r'\{\{([a-zA-Z_]+)}}', html_template)
         for variable in variables:
             html_template = html_template.replace('{{' + variable + '}}', str(kwargs.get(variable)))
         return html_template
 
     @staticmethod
-    def replace_src_links(html_text: str):
+    def replace_src_links(html_text: str) -> str:
+        """
+        Replace relative links from page, so even you are opening file without any host, still can see all contents,
+        still some css and js won't load
+
+        :param html_text: html code of page
+        :type html_text: str
+        :return: html code after modify all relative links
+        :rtype: str
+        """
         return re.sub(r'src=\s*?"//(.*)?"', r'src="https://\1"', html_text)
 
     @staticmethod
     def cookie_str_to_dict(cookie_str: str):
+        """
+        Convert cookie str to dict of key, value pairs
+
+        :param cookie_str: cookie in format of string [key=value; key=value]
+        :type cookie_str: str
+        :return: dictionary of key value pairs of key value pairs
+        :rtype: dict
+        """
         ret = {}
         cookie_pairs = cookie_str.split(';')
         for pair in cookie_pairs:
@@ -113,6 +149,14 @@ class CheggScraper(object):
 
     @staticmethod
     def parse_json(json_string: str) -> (bool, dict):
+        """
+        just parse json
+
+        :param json_string: json data in format of string
+        :type json_string: str
+        :return: tuple of isJson, dictionary form of json
+        :rtype:
+        """
         try:
             data = json.loads(json_string)
             return True, data
@@ -121,7 +165,15 @@ class CheggScraper(object):
             return False, None
 
     @staticmethod
-    def json_to_cookie_str(cookie_dict: dict):
+    def dict_to_cookie_str(cookie_dict: dict) -> str:
+        """
+        Convert dict to cookie string
+
+        :param cookie_dict: dictionary of cookie, key value pairs
+        :type cookie_dict: dict
+        :return: cookie in string format
+        :rtype: str
+        """
         cookie_str = ''
         first_flag = True
         for cookie in cookie_dict:
@@ -132,16 +184,23 @@ class CheggScraper(object):
         return cookie_str
 
     @staticmethod
-    def parse_cookie(cookie_path: str):
+    def parse_cookie(cookie_path: str) -> str:
+        """
+        Parse cookie from cookie_path
+
+        :param cookie_path: path of cookie file
+        :type cookie_path: str
+        :return: string cookie
+        :rtype: str
+        """
         if os.path.exists(cookie_path):
             if os.path.isfile(cookie_path):
                 with open(cookie_path, 'r') as f:
                     cookie_text = f.read()
                     json_result = CheggScraper.parse_json(cookie_text)
                     if json_result[0]:
-                        return CheggScraper.json_to_cookie_str(json_result[1]).strip()
-                    else:
-                        return cookie_text.strip()
+                        return CheggScraper.dict_to_cookie_str(json_result[1]).strip()
+                    return cookie_text.strip()
             else:
                 logging.error(msg=f"{cookie_path} is not a file")
                 raise Exception
@@ -175,7 +234,6 @@ class CheggScraper(object):
         @return: modified FINAL html Text
         @rtype: str
         """
-
         soup = BeautifulSoup(html_text, 'lxml')
         if soup.find('div', {'id': 'show-more'}):
             soup.find('div', {'id': 'show-more'}).decompose()
@@ -195,10 +253,9 @@ class CheggScraper(object):
         if response.status_code not in expected_status:
             logging.error(msg=f'Expected status code {expected_status} but got {response.status_code}\n{error_note}')
             return response
-        else:
-            if note:
-                logging.info(msg=note)
-            return response
+        if note:
+            logging.info(msg=note)
+        return response
 
     def _get_response_text(self, url: str, headers: dict = None, expected_status: tuple = (200,),
                            note: str = None, error_note: str = "Error in request"):
@@ -368,7 +425,3 @@ class CheggScraper(object):
             f.write(final_html)
 
         return file_path
-
-
-if __name__ == '__main__':
-    pass
