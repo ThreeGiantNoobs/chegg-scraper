@@ -1,9 +1,12 @@
 import os
 import re
 import json
+from contextlib import redirect_stderr
+
 import requests
 import logging
 import unicodedata
+from importlib.resources import read_text
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -12,7 +15,8 @@ logging.basicConfig(filename='scraper.log', filemode='w', level=logging.DEBUG)
 
 
 class CheggScraper(object):
-    def __init__(self, cookie: str = None, cookie_path: str = None):
+    def __init__(self, cookie: str = None, cookie_path: str = None, user_agent: str = None, base_path: str = None,
+                 save_file_path: str = None, config: dict = None, template_path: str = None):
         if cookie:
             self.cookie = cookie
         else:
@@ -20,10 +24,19 @@ class CheggScraper(object):
 
         self.cookie_dict = self.cookie_str_to_dict(self.cookie)
 
-        with open('conf.json', 'r') as f:
-            conf = json.load(f)
-        user_agent = conf.get('user_agent')
-        self.base_path = conf.get('base_path')
+        self.template_path = template_path
+
+        if not config:
+            config = json.loads(read_text('cheggscraper', 'conf.json'))
+
+        if not user_agent:
+            user_agent = config.get('user_agent')
+        if not user_agent:
+            raise Exception('user_agent not defined')
+
+        if not base_path:
+            self.base_path = config.get('base_path')
+
         if not self.base_path:
             self.base_path = ''
 
@@ -63,15 +76,20 @@ class CheggScraper(object):
         value = re.sub(r'[^\w\s-]', '', value.lower())
         return re.sub(r'[-\s]+', '-', value).strip('-_')
 
-    @staticmethod
-    def render_html(**kwargs):
+    def render_html(self, **kwargs):
 
         template_path = kwargs.get('template_path')
+        html_template = None
         if not template_path:
-            template_path = 'template.html'
+            template_path = self.template_path
 
-        with open(template_path, 'r') as f:
-            html_template = f.read()
+        if not template_path:
+            html_template = read_text('cheggscraper', 'template.html')
+
+        if not html_template:
+            with open(template_path, 'r') as f:
+                html_template = f.read()
+
 
         variables = re.findall(r'\{\{([a-zA-Z_]+)}}', html_template)
         for variable in variables:

@@ -1,3 +1,9 @@
+*
+!conf.json
+!setup.py
+!*/
+!cheggscraper/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -135,9 +141,4 @@ cookie.json
 *.pdf
 *.html
 
-
-
-
-*
-!template.html
-!conf.json
+!cheggscraper/template.html
