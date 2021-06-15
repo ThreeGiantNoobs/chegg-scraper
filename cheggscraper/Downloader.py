@@ -1,24 +1,9 @@
 import argparse
 import json
 import os
-import sys
 from importlib.resources import read_text
 
 from .CheggScraper import CheggScraper
-
-# conf = json.loads(read_text('cheggscraper', 'conf.json'))
-#
-# default_save_file_path = conf.get('default_save_file_path')
-# default_cookie_file_path = conf.get('default_cookie_file_path')
-#
-# ap = argparse.ArgumentParser()
-# ap.add_argument('-c', '--cookie', default=default_cookie_file_path,
-#                 help='path of cookie life', dest='cookie_file')
-# ap.add_argument('-u', '--url', help='url of chegg homework-help, put inside " "',
-#                 type=str, dest='url')
-# ap.add_argument('-s', '--save', help='file path, where you want to save, put inside " " eg: test.html or D:\\myFolder\\test.html or /home/test.html',
-#                 type=str, default=default_save_file_path, dest='file_path')
-# args = vars(ap.parse_args())
 
 
 def main():

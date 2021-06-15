@@ -1,0 +1,63 @@
+<div class="right-rail-adjust" id="solution-player-sdk">
+    <link rel="stylesheet" href="https://c.cheggcdn.com/chegg-solution-player/prod/1.6.30/css/styles.css">
+    <section class="TBSPlayer TBS_ROOT" data-reactroot="">
+        <header class="toolbar TBS_TOOLBAR" style="" tabindex="-1">
+            <div aria-hidden="true" aria-live="polite" class="visually-hidden" id="notification"></div>
+            <button aria-checked="false" aria-label="Open Table of Contents" class="button button-icon toggle-button-toolbar" id="toc-button"
+                    role="switch" tabindex="0"></button>
+            <h2 class="title">Chapter {{chapterName}}, Problem {{problemName}}</h2>
+            <div id="float-right-container">
+                <div class="show-hide-all"><label><!-- react-text: 12 -->Show all steps<!-- /react-text -->
+                    <!-- react-text: 13 -->:<!-- /react-text --></label>
+                    <button aria-checked="true" aria-label="Hide All Steps" class=" toggle-button" id="show-all-steps" role="switch"
+                            tabindex="0"><span>on</span></button>
+                </div>
+                <button aria-checked="false" aria-label="Full Screen" class="button button-icon fullscreen expand" id="fullscreen"
+                        role="switch" tabindex="0"></button>
+            </div>
+        </header>
+        <section class="main">
+            <div>
+                <section class="problem TBS_PROBLEM has-content" data-id="50P">
+                    <button aria-label="Previous problem" class="arrow arrow-left" data-hover="Prev" id="problem-previous"
+                            tabindex="0"></button>
+                    <header><h3 class="player-title">Problem</h3></header>
+                    <div class="problem-content">
+                        <div class="problem-html">
+                            <div class="html">
+                                {{problemHtml}}
+                            </div>
+                        </div>
+                    </div>
+                    <section class="solution TBS_SOLUTION">
+                        <header><h3 class="player-title">Step-by-step solution</h3></header>
+                        <ol class="steps">
+                            {% for step in steps %}
+                                <li>
+                                    <br>
+                                    <br>
+                                    <section class="step TBS_SOLUTION_STEP opened" data-id="{{step.id}}"><h4 aria-pressed="true"
+                                                                                                         class="step-header"
+                                                                                                         role="button"
+                                                                                                         tabindex="0">
+                                        <span class="step-num">Step {{loop.index}} </span><span class="step-total">of {{totalSteps}}</span></h4>
+                                        <div class="content">
+                                            <div class="html step-html">
+                                                {{step.html}}
+                                            </div>
+                                        </div>
+                                    </section>
+                                </li>
+                            {% endfor %}
+                        </ol></section>
+                    <button aria-label="Next problem" class="arrow arrow-right" data-hover="Next" tabindex="0"></button>
+                </section>
+            </div>
+            <div class="rr-anchors" id="related-anchors">
+                <div class="walkthrough-anchor solo-anchor">Walkthrough<br>for problem</div>
+            </div>
+        </section>
+        <span aria-live="polite" id="live-region-9816" role="status"
+              style="clip: rect(1px, 1px, 1px, 1px); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px">Loading content</span>
+    </section>
+</div>

@@ -2,16 +2,17 @@ from setuptools import setup
 
 setup(
     name='cheggscraper',
-    version='0.1',
+    version='1.1',
     description='Convert Chegg url to complete html',
     packages=['cheggscraper'],
     install_requires=[
         'beautifulsoup4',
         'lxml',
         'requests',
+        'jinja2',
     ],
     package_data={
-        '': ['conf.json', 'template.html'],
+        '': ['conf.json', 'template.html', 'chapter_type_frame.html'],
     },
     include_package_data=True
 )
