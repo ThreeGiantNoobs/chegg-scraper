@@ -1,23 +1,27 @@
+import json
+import logging
 import os
 import re
-import json
-from contextlib import redirect_stderr
-
-import requests
-import logging
 import unicodedata
 from importlib.resources import read_text
 
+import requests
+from requests import Response
 from bs4 import BeautifulSoup
 from bs4.element import Tag
+from jinja2 import Environment, BaseLoader
 
 logging.basicConfig(filename='scraper.log', filemode='w', level=logging.DEBUG)
+
+main_template = Environment(loader=BaseLoader).from_string(read_text('cheggscraper', 'template.html'))
+chapter_type_template = Environment(loader=BaseLoader).from_string(read_text('cheggscraper', 'chapter_type_frame.html'))
 
 
 class CheggScraper:
     """
     Scrape html from chegg.com and store them in a way so you don't need cookie to view the file
     """
+
     def __init__(self, cookie: str = None, cookie_path: str = None, user_agent: str = None, base_path: str = None,
                  save_file_path: str = None, config: dict = None, template_path: str = None):
         if cookie:
@@ -47,14 +51,17 @@ class CheggScraper:
         if not user_agent:
             raise Exception('user_agent is None')
 
+        self.user_agent = user_agent
+
         self.headers = {
             'authority': 'www.chegg.com',
             'cache-control': 'max-age=0',
             'sec-ch-ua': '\\',
             'sec-ch-ua-mobile': '?0',
             'upgrade-insecure-requests': '1',
-            'user-agent': user_agent,
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'user-agent': self.user_agent,
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9;application/json',
+            'content-type': "application/json",
             'sec-fetch-site': 'none',
             'sec-fetch-mode': 'navigate',
             'sec-fetch-user': '?1',
@@ -89,31 +96,29 @@ class CheggScraper:
         value = re.sub(r'[^\w\s-]', '', value.lower())
         return re.sub(r'[-\s]+', '-', value).strip('-_')
 
-    def render_html(self, **kwargs) -> str:
+    @staticmethod
+    def render_chapter_type_html(data: dict) -> str:
         """
-        render html from template file: {{var}}
+        Render chapter type answers using data
 
-        :param kwargs: key, value to replace in template
-        :type kwargs:
+        :param data: response from graphql url
+        :type data: dict
         :return: rendered html code
         :rtype: str
         """
-        template_path = kwargs.get('template_path')
-        html_template = None
-        if not template_path:
-            template_path = self.template_path
+        chapter_d = data['data']['textbook_solution']['chapter'][0]
+        problem_d = chapter_d['problems'][0]
+        solutionV2 = problem_d['solutionV2'][0]
 
-        if not template_path:
-            html_template = read_text('cheggscraper', 'template.html')
+        _data = {
+            'chapterName': chapter_d['chapterName'],
+            'problemName': problem_d['problemName'],
+            'problemHtml': problem_d['problemHtml'],
+            'totalSteps': solutionV2['totalSteps'],
+            'steps': solutionV2['steps'],
+        }
 
-        if not html_template:
-            with open(template_path, 'r') as f:
-                html_template = f.read()
-
-        variables = re.findall(r'\{\{([a-zA-Z_]+)}}', html_template)
-        for variable in variables:
-            html_template = html_template.replace('{{' + variable + '}}', str(kwargs.get(variable)))
-        return html_template
+        return chapter_type_template.render(**_data)
 
     @staticmethod
     def replace_src_links(html_text: str) -> str:
@@ -129,7 +134,7 @@ class CheggScraper:
         return re.sub(r'src=\s*?"//(.*)?"', r'src="https://\1"', html_text)
 
     @staticmethod
-    def cookie_str_to_dict(cookie_str: str):
+    def cookie_str_to_dict(cookie_str: str) -> dict:
         """
         Convert cookie str to dict of key, value pairs
 
@@ -161,7 +166,7 @@ class CheggScraper:
             data = json.loads(json_string)
             return True, data
         except Exception as e:
-            logging.critical(msg=f'while parsing json: {e}')
+            logging.debug(msg=f'::while parsing json: {e}')
             return False, None
 
     @staticmethod
@@ -209,20 +214,25 @@ class CheggScraper:
             raise Exception
 
     @staticmethod
-    def clean_url(url: str) -> str:
+    def clean_url(url: str) -> (bool, str):
         """
         Cleans the url, So no track id goes to url
 
         @param url: url of chegg webpage
         @type url: str
         @return: Url removed with trackId
-        @rtype: str
+        @rtype: (bool, str)
         """
-        match = re.search(r'chegg\.com/homework-help/questions-and-answers/[^?/]+', url)
+        chapter_type = False
+        match = re.search(r'chegg\.com/homework-help/questions-and-answers/([^?/]+)', url)
         if not match:
-            logging.error(f'THIS URL NOT SUPPORTED\nurl: {url}')
-            raise Exception(f'THIS URL NOT SUPPORTED\nurl: {url}')
-        return 'https://www.' + match.group(0)
+            chapter_type = True
+            match = re.search(r'chegg\.com/homework-help/[^?/]+', url)
+            if not match:
+                logging.error(f'THIS URL NOT SUPPORTED\nurl: {url}')
+                raise Exception(f'THIS URL NOT SUPPORTED\nurl: {url}')
+
+        return chapter_type, 'https://www.' + match.group(0)
 
     @staticmethod
     def final_touch(html_text: str) -> str:
@@ -242,13 +252,28 @@ class CheggScraper:
 
         return str(soup)
 
-    def _web_response(self, url: str, headers: dict = None, expected_status: tuple = (200,),
-                      note: str = None, error_note: str = "Error in request"):
+    def _web_response(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
+                      error_note: str = "Error in request", post: bool = False, data: dict = None, _json=None) -> Response:
+        """
+        Returns response
+
+        :return: return response from web
+        :rtype: Response
+        """
+
         if not headers:
             headers = self.headers
-        response = requests.get(
-            url=url,
-            headers=headers)
+        if post:
+            response = requests.post(
+                url=url,
+                headers=headers,
+                json=_json,
+                data=data
+            )
+        else:
+            response = requests.get(
+                url=url,
+                headers=headers)
 
         if response.status_code not in expected_status:
             logging.error(msg=f'Expected status code {expected_status} but got {response.status_code}\n{error_note}')
@@ -258,19 +283,33 @@ class CheggScraper:
         return response
 
     def _get_response_text(self, url: str, headers: dict = None, expected_status: tuple = (200,),
-                           note: str = None, error_note: str = "Error in request"):
+                           note: str = None, error_note: str = "Error in request") -> str:
+        """
+        Text response from web
+
+        :return: Text response from web
+        :rtype: str
+        """
         response = self._web_response(url, headers, expected_status, note, error_note)
         return response.text
 
-    def _get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,),
-                           note: str = None, error_note: str = "Error in request"):
-        response = self._web_response(url, headers, expected_status, note, error_note)
+    def _get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
+                           error_note: str = "Error in request", post: bool = False, data: dict = None, _json=None) -> dict:
+        """
+        Dict response from web
+
+        :return: json response from web
+        :rtype: dict
+        """
+        response = self._web_response(url, headers, expected_status, note, error_note, post=post, data=data,
+                                      _json=_json)
         return response.json()
 
     @staticmethod
     def _parse_question(soup: BeautifulSoup) -> Tag:
         """
         Simply parse question
+
 
         @param soup: BeautifulSoup from chegg_html
         @type soup: BeautifulSoup
@@ -297,7 +336,8 @@ class CheggScraper:
 
         return soup.find('div', {'class': 'question-body-text'})
 
-    def _parse_answer(self, soup: BeautifulSoup, question_uuid: str, html_text: str) -> str:
+    def _parse_answer(self, soup: BeautifulSoup, question_uuid: str, html_text: str, url: str,
+                      chapter_type: bool = False) -> str:
         """
         Parse Answers as a div from soup
 
@@ -312,6 +352,27 @@ class CheggScraper:
         """
         token = re.search(r'"token":"(.+?)"', html_text).group(1)
 
+        if chapter_type:
+            chapter_id = str(re.search(r'\?id=(\d+).*?isbn', html_text).group(1))
+            isbn13 = str(re.search(r'"isbn13":"(\d+)"', html_text).group(1))
+            problemId = str(re.search(r'"problemId":"(\d+)"', html_text).group(1))
+
+            query = {
+                "query": {
+                    "operationName": "getSolutionDetails",
+                    "variables": {
+                        "isbn13": isbn13,
+                        "chapterId": chapter_id,
+                        "problemId": problemId
+                    }
+                },
+                "token": token
+            }
+            graphql_url = 'https://www.chegg.com/study/_ajax/persistquerygraphql'
+
+            res_data = self._get_response_dict(url=graphql_url, post=True, data=query, _json=query)
+            return self.render_chapter_type_html(res_data)
+
         to_load_enhanced_content = False
         enhanced_content_div = soup.find('div', {'id': 'enhanced-content'})
         if enhanced_content_div:
@@ -323,8 +384,10 @@ class CheggScraper:
             _s_ = [str(x) for x in answers_list_li]
             answers__ = '<ul class="answers-list">' + "".join(_s_) + "</ul>"
         elif to_load_enhanced_content:
-            content_request_url = self.ajax_url.format(question_uuid=question_uuid, token=token, deviceFingerPrintId=self.deviceFingerPrintId)
-            answers__ = '<div id="enhanced-content"><hr>' + self._get_response_dict(url=content_request_url)['enhancedContentMarkup'] + "</div>"
+            content_request_url = self.ajax_url.format(question_uuid=question_uuid, token=token,
+                                                       deviceFingerPrintId=self.deviceFingerPrintId)
+            answers__ = '<div id="enhanced-content"><hr>' + self._get_response_dict(url=content_request_url)[
+                'enhancedContentMarkup'] + "</div>"
         else:
             raise Exception
 
@@ -349,12 +412,17 @@ class CheggScraper:
             if meta_description:
                 heading = meta_description.get('content')
         if not heading:
+            title = soup.find('title')
+            if title:
+                heading = title.text
+
+        if not heading:
             logging.error(msg="can't able to get heading")
         else:
             logging.info(msg=f"Heading: {heading}")
         return str(heading)
 
-    def _parse(self, html_text: str) -> (str, str):
+    def _parse(self, html_text: str, url: str, chapter_type: bool = None) -> (str, str):
         html_text = self.replace_src_links(html_text)
         soup = BeautifulSoup(html_text, 'lxml')
         logging.debug("HTML\n\n" + html_text + "HTML\n\n")
@@ -366,17 +434,27 @@ class CheggScraper:
         heading = self._parse_heading(soup)
 
         """Parse Question"""
-        _, question_data = self.parse_json(re.search(r'C\.page\.homeworkhelp_question\((.*)?\);', html_text).group(1))
+        if not chapter_type:
+            _, question_data = self.parse_json(
+                re.search(r'C\.page\.homeworkhelp_question\((.*)?\);', html_text).group(1))
+        else:
+            _ = True
+            question_data = None
         logging.debug(msg=str(question_data))
+        questionUuid = None
         if _:
-            questionUuid = question_data['question']['questionUuid']
+            if not chapter_type:
+                questionUuid = question_data['question']['questionUuid']
         else:
             raise Exception('Unable to get question uuid')
-        
-        question_div = self._parse_question(soup)
+
+        if chapter_type:
+            question_div = '<div></div>'
+        else:
+            question_div = self._parse_question(soup)
 
         """Parse Answer"""
-        answers_div = self._parse_answer(soup, questionUuid, html_text)
+        answers_div = self._parse_answer(soup, questionUuid, html_text, url, chapter_type=chapter_type)
 
         return headers, heading, question_div, answers_div, questionUuid
 
@@ -391,13 +469,14 @@ class CheggScraper:
         @return: file_path
         @rtype: str
         """
-        url = self.clean_url(url)
+        chapter_type, url = self.clean_url(url)
 
         html_res_text = self._get_response_text(url=url)
 
-        headers, heading, question_div, answers__, question_uuid = self._parse(html_text=html_res_text)
+        headers, heading, question_div, answers__, question_uuid = self._parse(html_text=html_res_text,
+                                                                               chapter_type=chapter_type, url=url)
 
-        html_rendered_text = self.render_html(
+        html_rendered_text = main_template.render(
             headers=headers,
             title=heading,
             heading=heading,

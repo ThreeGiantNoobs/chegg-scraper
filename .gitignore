@@ -141,4 +141,6 @@ cookie.json
 *.pdf
 *.html
 
+
 !cheggscraper/template.html
+!cheggscraper/chapter_type_frame.html
