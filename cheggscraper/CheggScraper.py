@@ -370,7 +370,7 @@ class CheggScraper:
             }
             graphql_url = 'https://www.chegg.com/study/_ajax/persistquerygraphql'
 
-            res_data = self._get_response_dict(url=graphql_url, post=True, data=query, _json=query)
+            res_data = self._get_response_dict(url=graphql_url, post=True, _json=query)
             return self.render_chapter_type_html(res_data)
 
         to_load_enhanced_content = False
