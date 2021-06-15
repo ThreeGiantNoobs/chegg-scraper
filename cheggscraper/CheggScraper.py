@@ -285,7 +285,7 @@ class CheggScraper:
     def _get_response_text(self, url: str, headers: dict = None, expected_status: tuple = (200,),
                            note: str = None, error_note: str = "Error in request") -> str:
         """
-        Text response from web
+        text response from web
 
         :return: Text response from web
         :rtype: str
@@ -296,7 +296,7 @@ class CheggScraper:
     def _get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
                            error_note: str = "Error in request", post: bool = False, data: dict = None, _json=None) -> dict:
         """
-        Dict response from web
+        dict response from web
 
         :return: json response from web
         :rtype: dict
