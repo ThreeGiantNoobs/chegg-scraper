@@ -316,24 +316,7 @@ class CheggScraper:
         @return: div containing question
         @rtype: Tag
         """
-        # # This Parse Question If not Login
-        # question_data = None
-        # _question_data = None
-        # __question_data = re.search(
-        #     r'window.__QUESTION_DATA__ = (\{.+})?;',
-        #     html_text)
-        #
-        # if __question_data:
-        #     _question_data = __question_data.group(1)
-        #
-        # json_result = self.parse_json(_question_data)
-        # if json_result[0]:
-        #     question_data = json_result[1]
-        #
-        # if not question_data:
-        #     logging.error(msg="can't able to get question")
-        #     raise Exception("can't able to parse question, ERROR")
-
+        
         return soup.find('div', {'class': 'question-body-text'})
 
     def _parse_answer(self, soup: BeautifulSoup, question_uuid: str, html_text: str, url: str,
