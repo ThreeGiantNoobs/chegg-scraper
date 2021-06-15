@@ -316,7 +316,7 @@ class CheggScraper:
         @return: div containing question
         @rtype: Tag
         """
-        
+
         return soup.find('div', {'class': 'question-body-text'})
 
     def _parse_answer(self, soup: BeautifulSoup, question_uuid: str, html_text: str, url: str,

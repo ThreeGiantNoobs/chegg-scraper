@@ -9,6 +9,7 @@ setup(
         'beautifulsoup4',
         'lxml',
         'requests',
+        'jinja2',
     ],
     package_data={
         '': ['conf.json', 'template.html'],
