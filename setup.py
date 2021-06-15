@@ -12,7 +12,7 @@ setup(
         'jinja2',
     ],
     package_data={
-        '': ['conf.json', 'template.html'],
+        '': ['conf.json', 'template.html', 'chapter_type_frame.html'],
     },
     include_package_data=True
 )
