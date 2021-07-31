@@ -1,20 +1,15 @@
 import json
 import logging
 import os
-import random
 import re
-import string
 import unicodedata
 from importlib.resources import read_text
-from typing import Union
 
 import requests
 from requests import Response
 from bs4 import BeautifulSoup
-from bs4.element import Tag, NavigableString
+from bs4.element import Tag
 from jinja2 import Environment, BaseLoader
-
-from .Exceptions import *
 
 logging.basicConfig(filename='scraper.log', filemode='w', level=logging.DEBUG)
 
@@ -28,22 +23,7 @@ class CheggScraper:
     """
 
     def __init__(self, cookie: str = None, cookie_path: str = None, user_agent: str = None, base_path: str = None,
-                 save_file_format: str = None, config: dict = None, template_path: str = None,
-                 extra_header_tag: str = None):
-
-        self.base_path = base_path
-
-        self.save_file_format = save_file_format
-
-        if self.base_path:
-            if not os.path.exists(self.base_path):
-                os.makedirs(self.base_path)
-
-        if not self.base_path:
-            self.base_path = ''
-
-        self.extra_header_tag = extra_header_tag
-
+                 save_file_path: str = None, config: dict = None, template_path: str = None):
         if cookie:
             self.cookie = cookie
         else:
@@ -61,7 +41,15 @@ class CheggScraper:
         if not user_agent:
             raise Exception('user_agent not defined')
 
+        if not base_path:
+            self.base_path = config.get('base_path')
+
+        if not self.base_path:
+            self.base_path = ''
+
         logging.debug(msg=f'user_agent: {user_agent}')
+        if not user_agent:
+            raise Exception('user_agent is None')
 
         self.user_agent = user_agent
 
@@ -220,9 +208,10 @@ class CheggScraper:
                     return cookie_text.strip()
             else:
                 logging.error(msg=f"{cookie_path} is not a file")
+                raise Exception
         else:
             logging.error(msg=f"{cookie_path} don't exist")
-        raise CookieFileDoesNotExist(cookie_path)
+            raise Exception
 
     @staticmethod
     def clean_url(url: str) -> (bool, str):
@@ -241,7 +230,7 @@ class CheggScraper:
             match = re.search(r'chegg\.com/homework-help/[^?/]+', url)
             if not match:
                 logging.error(f'THIS URL NOT SUPPORTED\nurl: {url}')
-                raise UrlNotSupported(url)
+                raise Exception(f'THIS URL NOT SUPPORTED\nurl: {url}')
 
         return chapter_type, 'https://www.' + match.group(0)
 
@@ -264,8 +253,7 @@ class CheggScraper:
         return str(soup)
 
     def _web_response(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
-                      error_note: str = "Error in request", post: bool = False, data: dict = None,
-                      _json=None) -> Response:
+                      error_note: str = "Error in request", post: bool = False, data: dict = None, _json=None) -> Response:
         """
         Returns response
 
@@ -306,8 +294,7 @@ class CheggScraper:
         return response.text
 
     def _get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
-                           error_note: str = "Error in request", post: bool = False, data: dict = None,
-                           _json=None) -> dict:
+                           error_note: str = "Error in request", post: bool = False, data: dict = None, _json=None) -> dict:
         """
         dict response from web
 
@@ -385,7 +372,7 @@ class CheggScraper:
             answers__ = '<div id="enhanced-content"><hr>' + self._get_response_dict(url=content_request_url)[
                 'enhancedContentMarkup'] + "</div>"
         else:
-            raise FailedToParseAnswer
+            raise Exception
 
         return answers__
 
@@ -423,9 +410,6 @@ class CheggScraper:
         soup = BeautifulSoup(html_text, 'lxml')
         logging.debug("HTML\n\n" + html_text + "HTML\n\n")
 
-        if soup.find('div', id='px-captcha'):
-            raise BotFlagError
-
         """Parse headers"""
         headers = soup.find('head')
 
@@ -445,7 +429,7 @@ class CheggScraper:
             if not chapter_type:
                 questionUuid = question_data['question']['questionUuid']
         else:
-            raise UnableToParseUUID
+            raise Exception('Unable to get question uuid')
 
         if chapter_type:
             question_div = '<div></div>'
@@ -457,63 +441,16 @@ class CheggScraper:
 
         return headers, heading, question_div, answers_div, questionUuid
 
-    def _save_html_file(self, rendered_html: str, heading: str = None, question_uuid: str = None,
-                        file_name_format: str = None):
-        heading = self.slugify(heading.strip('.').strip())
-        if not file_name_format:
-            file_name_format = self.save_file_format
-        if not file_name_format:
-            file_name_format = heading + '.html'
-
-        file_path = os.path.join(
-            self.base_path,
-            file_name_format)
-
-        file_path = file_path.format(**{
-            'random_u_str_int': ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)),
-            'random_u_str': ''.join(random.choices(string.ascii_uppercase, k=10)),
-            'random_str': ''.join(random.choices(string.ascii_letters, k=10)),
-            'random_int': ''.join(random.choices(string.digits, k=10)),
-            'heading': heading,
-            'title': heading,
-            'question_uuid': question_uuid
-        })
-
-        # if self.save_file_format:
-        #     file_path = os.path.join(
-        #         file_path,
-        #         self.save_file_format)
-
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(rendered_html)
-
-        return file_path
-
-    def _render_html(self, url, headers, heading, question_div, answers__):
-        html_rendered_text = main_template.render(
-            url=url,
-            headers=headers,
-            title=heading,
-            heading=heading,
-            question_body=question_div,
-            answers_wrap=answers__,
-            extra_header_tag=self.extra_header_tag,
-        )
-
-        return self.final_touch(html_text=html_rendered_text)
-
-    def url_to_html(self, url: str, file_name_format: str = None, get_dict_info: bool = False):
+    def url_to_html(self, url: str, file_path: str = None) -> str:
         """
         Chegg url to html file, saves the file and return file path
 
         @param url: chegg url
         @type url: str
-        @param get_dict_info:
-        @type get_dict_info:
-        @param file_name_format: File path to save file
-        @type file_name_format: str
+        @param file_path: File path to save file
+        @type file_path: str
         @return: file_path
-        @rtype:
+        @rtype: str
         """
         chapter_type, url = self.clean_url(url)
 
@@ -522,10 +459,31 @@ class CheggScraper:
         headers, heading, question_div, answers__, question_uuid = self._parse(html_text=html_res_text,
                                                                                chapter_type=chapter_type, url=url)
 
-        rendered_html = self._render_html(url, headers, heading, question_div, answers__)
+        html_rendered_text = main_template.render(
+            headers=headers,
+            title=heading,
+            heading=heading,
+            question_body=question_div,
+            answers_wrap=answers__
+        )
 
-        file_path = self._save_html_file(rendered_html, heading, question_uuid, file_name_format)
+        final_html = self.final_touch(html_text=html_rendered_text)
 
-        if get_dict_info:
-            return file_path, url, headers, heading, question_div, answers__
+        heading = self.slugify(heading.strip('.').strip())
+        if not file_path:
+            file_path = heading + '.html'
+
+        file_path = os.path.join(
+            self.base_path,
+            file_path)
+
+        file_path = file_path.format(**{
+            'heading': heading,
+            'title': heading,
+            'question_uuid': question_uuid
+        })
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(final_html)
+
         return file_path
