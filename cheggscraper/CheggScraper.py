@@ -6,12 +6,11 @@ import re
 import string
 import unicodedata
 from importlib.resources import read_text
-from typing import Union
 
 import requests
 from requests import Response
 from bs4 import BeautifulSoup
-from bs4.element import Tag, NavigableString
+from bs4.element import Tag
 from jinja2 import Environment, BaseLoader
 
 from .Exceptions import *
@@ -68,13 +67,12 @@ class CheggScraper:
         self.headers = {
             'authority': 'www.chegg.com',
             'cache-control': 'max-age=0',
-            'sec-ch-ua': '\\',
+            'sec-ch-ua': '" Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
             'sec-ch-ua-mobile': '?0',
             'upgrade-insecure-requests': '1',
             'user-agent': self.user_agent,
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9;application/json',
-            'content-type': "application/json",
-            'sec-fetch-site': 'none',
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+            'sec-fetch-site': 'cross-site',
             'sec-fetch-mode': 'navigate',
             'sec-fetch-user': '?1',
             'sec-fetch-dest': 'document',
