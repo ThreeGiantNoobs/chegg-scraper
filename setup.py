@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='cheggscraper',
-    version='1.1',
+    version='1.3',
     description='Convert Chegg url to complete html',
     packages=['cheggscraper'],
     install_requires=[
