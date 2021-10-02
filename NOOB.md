@@ -3,7 +3,7 @@
 This scrapper can scrape through [Chegg.com](https://www.chegg.com) and create an html file to save the content locally.
 The repository can be used in Chegg-Scraping Bots or for downloading the webpage.
 ###How To Use ??
-First of all, download the latest release from [here](https://github.com/ThreeGiantNoobs/chegg-scraper/releases/latest)
+First, download the latest release from [here](https://github.com/ThreeGiantNoobs/chegg-scraper/releases/latest)
 
 After unzipping, install the requirements by using
 
@@ -22,8 +22,8 @@ Now in order to run the file, use
 
 There are 2 optional arguments
 
-    -url or -u --> To enter the page url
-    -cookie or -c --> To enter the cookies file path
+    --url or -u --> To enter the page url
+    --cookie or -c --> To enter the cookies file path
 
 Cookies are supported in 2 formats, ``cookie.txt`` or ``cookie.json``
 For .txt format, copy the cookie from `document.cookies` from the Browser console
@@ -33,7 +33,7 @@ Once the cookie file is made, You need to add the cookie file in the project fol
 
 ####Example for Usage
 
-    python Downloader.py -c path/to/the/file -u "https://chegg.com/using-chegg-scraper"
+    python Downloader.py -c path/to/the/cookie/file.txt -u "https://chegg.com/using-chegg-scraper"
 If the cookie is saved as cookie.txt or cookie.json in the project folder you can run the following as:
 
     python Downloader.py -u "https://chegg.com/using-chegg-scraper"

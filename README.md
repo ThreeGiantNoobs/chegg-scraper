@@ -12,9 +12,6 @@ Download Chegg homework-help questions to html files, these html files are self 
     <li>
         You will not need you chegg account to open these files later.
     </li>
-    <li>
-        (Optional) It's preferred to have internet access to load css, and some js . [preffer to host files eg: localhost or someOtherDomain]
-    </li>
 </details>
 
 
@@ -102,9 +99,9 @@ Download Chegg homework-help questions to html files, these html files are self 
 
   ```
   ALL ARGUMENTS ARE OPTIONAL
-  -u or -url      >   URL of Chegg
-  -c or -cookie   >   Path of Cookie file (Defualt: cookie.txt)
-  -s or -save     >   file path, where you want to save, put inside " "
+  -u or --url      >   URL of Chegg
+  -c or --cookie   >   Path of Cookie file (Defualt: cookie.txt)
+  -s or --save     >   file path, where you want to save, put inside " "
   ```
   
   
