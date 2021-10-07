@@ -10,7 +10,7 @@ Download Chegg homework-help questions to html files, these html files are self 
 		All files are saved to html document.
     </li>
     <li>
-        You will not need you chegg account to open these files later.
+        You will not need your chegg account to open these files later.
     </li>
 </details>
 
@@ -57,7 +57,7 @@ Download Chegg homework-help questions to html files, these html files are self 
   <details>
       <summary>Using Chrome Extenstion</summary>
       <ul>
-          <li>Log-in to chegg in your browser</li>
+          <li>Log-in to chegg in your web browser</li>
       </ul>
       <ul>
           <li>Open Extension (Example) <a href='https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg'>EditThisCookie</a></li>
