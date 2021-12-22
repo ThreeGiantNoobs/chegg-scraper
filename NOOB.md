@@ -26,9 +26,8 @@ There are 2 optional arguments
     --url or -u --> To enter the page url
     --cookie or -c --> To enter the cookies file path
 
-Cookies are supported in 2 formats- ``cookie.txt`` or ``cookie.json``
-For .txt format, copy the cookie from `document.cookies` from the Browser console
-. For .json format, you may use a browser extension like [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg)
+Cookies are supported in ``cookie.txt`` format.
+Copy the cookie from `document.cookies` from the Browser console or you may use a browser extension like [EditThisCookie](https://chrome.google.com/webstore/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg)
 
 Once the cookie file is made, You need to add the cookie file in the project folder to save yourself from the `-c` argument or use `-c` argument to provide cookie path to the downloader before each run.
 
