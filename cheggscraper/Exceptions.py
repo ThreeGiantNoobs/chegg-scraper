@@ -1,4 +1,3 @@
-
 class FailedToParse(Exception):
     def __init__(self):
         self.message = 'Failed to parse data'
@@ -9,14 +8,38 @@ class UnableToParseUUID(FailedToParse):
         self.message = 'Unable to get question uuid'
 
 
+class UnexpectedStatusCode(Exception):
+    def __init__(self, status_code: int):
+        self.message = 'Unexpected status code: {}'.format(status_code)
+
+
+class UnableToGetLegacyQuestionID(FailedToParse):
+    def __init__(self):
+        self.message = 'Unable to get question legacy id'
+
+
 class FailedToParseAnswer(FailedToParse):
     def __init__(self):
         self.message = 'Failed to parse answer'
 
 
+class JsonParseError(Exception):
+    ...
+
+
+class UnableToGetToken(FailedToParse):
+    def __init__(self):
+        self.message = 'Unable to get token'
+
+
 class UrlNotSupported(ValueError):
     def __init__(self, url):
         self.message = f'URL NOT SUPPORTED: {url}'
+
+
+class DeviceAllowedQuotaExceeded(Exception):
+    def __init__(self):
+        self.message = 'Device allowed quota exceeded'
 
 
 class CookieFileDoesNotExist(FileNotFoundError):
