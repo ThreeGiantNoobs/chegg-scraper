@@ -385,12 +385,16 @@ class CheggScraper:
         }
 
         data = self._get_response_dict(url=graphql_url, post=True, _json=query, extra_headers=extra_headers)
-        if data['errors']:
-            logging.error(msg=f"Error in getting non chapter type data, legacy_id: {legacy_id}")
-            logging.error(msg=f"Error: {data['errors']['message']}")
-            if (restrictions := data['errors']['message'].get('extensions', {}).get('metadata', {}).get(
-                    'accessRestrictions')) and 'DEVICE_ALLOWED_QUOTA_EXCEEDED' in restrictions:
-                raise DeviceAllowedQuotaExceeded
+        try: 
+            if data['errors']:
+                logging.error(msg=f"Error in getting non chapter type data, legacy_id: {legacy_id}")
+                logging.error(msg=f"Error: {data['errors']['message']}")
+                if (restrictions := data['errors']['message'].get('extensions', {}).get('metadata', {}).get(
+                        'accessRestrictions')) and 'DEVICE_ALLOWED_QUOTA_EXCEEDED' in restrictions:
+                    raise DeviceAllowedQuotaExceeded
+        except KeyError:
+            # No errors found
+            pass
 
         return data
 
