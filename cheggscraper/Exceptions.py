@@ -8,6 +8,11 @@ class UnableToParseUUID(FailedToParse):
         self.message = 'Unable to get question uuid'
 
 
+class UnexpectedStatusCode(Exception):
+    def __init__(self, status_code: int):
+        self.message = 'Unexpected status code: {}'.format(status_code)
+
+
 class UnableToGetLegacyQuestionID(FailedToParse):
     def __init__(self):
         self.message = 'Unable to get question legacy id'
@@ -20,6 +25,11 @@ class FailedToParseAnswer(FailedToParse):
 
 class JsonParseError(Exception):
     ...
+
+
+class UnableToGetToken(FailedToParse):
+    def __init__(self):
+        self.message = 'Unable to get token'
 
 
 class UrlNotSupported(ValueError):

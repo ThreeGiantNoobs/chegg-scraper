@@ -173,7 +173,7 @@ class CheggScraper:
         :param json_string: json data in format of string
         :type json_string: str
         :return: dict
-        :rtype: dict|None
+        :rtype: dict
         """
         try:
             data = json.loads(json_string)
@@ -194,10 +194,10 @@ class CheggScraper:
         """
         cookie_str = ''
         first_flag = True
-        for name, value in cookie_dict.items():
+        for cookie in cookie_dict:
             if not first_flag:
                 cookie_str += '; '
-            cookie_str += '{name}={value}'.format(name=name, value=value)
+            cookie_str += '{name}={value}'.format(**cookie)
             first_flag = False
         return cookie_str
 
@@ -215,12 +215,13 @@ class CheggScraper:
             if os.path.isfile(cookie_path):
                 with open(cookie_path, 'r') as f:
                     cookie_text = f.read()
-                    json_result = CheggScraper.parse_json(cookie_text)
-                    if json_result[0]:
+                    try:
+                        json_result = CheggScraper.parse_json(cookie_text)
                         logging.debug(f'::cookie_path: {cookie_path} is json file')
-                        return CheggScraper.dict_to_cookie_str(json_result[1]).strip()
-                    logging.debug(f'::cookie_path: {cookie_path} is not json file')
-                    return cookie_text.strip()
+                        return CheggScraper.dict_to_cookie_str(json_result).strip()
+                    except JsonParseError:
+                        logging.debug(f'::cookie_path: {cookie_path} is not json file')
+                        return cookie_text.strip()
             else:
                 logging.error(msg=f"{cookie_path} is not a file")
         else:
@@ -260,15 +261,17 @@ class CheggScraper:
 
         return str(soup)
 
-    def _web_response(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
-                      error_note: str = "Error in request", post: bool = False, data: dict = None,
-                      _json=None) -> Response:
+    def _web_response(self, url: str, headers: dict = None, extra_headers: dict = None, expected_status: tuple = (200,),
+                      note: str = None, error_note: str = "Error in request", post: bool = False, data: dict = None,
+                      _json=None, raise_exception=False) -> Response:
         """
         Returns response from web
         """
 
         if not headers:
             headers = self.headers
+        if extra_headers:
+            headers.update(extra_headers)
         if post:
             response = requests.post(
                 url=url,
@@ -282,37 +285,48 @@ class CheggScraper:
                 headers=headers)
 
         if response.status_code not in expected_status:
-            logging.error(msg=f'Expected status code {expected_status} but got {response.status_code}\n{error_note}')
+            logging.error(msg=f'Expected status codes {expected_status} but got {response.status_code}\n{error_note}')
+            if raise_exception:
+                raise UnexpectedStatusCode(response.status_code)
             return response
         if note:
             logging.info(msg=note)
         return response
 
-    def _get_response_text(self, url: str, headers: dict = None, expected_status: tuple = (200,),
-                           note: str = None, error_note: str = "Error in request") -> str:
+    def _get_response_text(self, url: str, headers: dict = None, extra_headers: dict = None,
+                           expected_status: tuple = (200,), note: str = None,
+                           error_note: str = "Error in request", raise_exception=False) -> str:
         """
         text response from web
 
         :return: Text response from web
         :rtype: str
         """
-        response = self._web_response(url, headers, expected_status, note, error_note)
+        logging.debug(msg=f'::getting response from url: {url}')
+        response = self._web_response(url=url, headers=headers, extra_headers=extra_headers,
+                                      expected_status=expected_status, note=note,
+                                      error_note=error_note, raise_exception=raise_exception)
+        logging.info(msg=f'::response status code: {response.status_code}')
         if response.status_code not in expected_status:
             raise Exception(f'Expected status code {expected_status} but got {response.status_code}\n{error_note}')
         return response.text
 
-    def _get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
-                           error_note: str = "Error in request", post: bool = False, data: dict = None,
-                           _json=None) -> dict:
+    def _get_response_dict(self, url: str, headers: dict = None, extra_headers: dict = None,
+                           expected_status: tuple = (200,), note: str = None, error_note: str = "Error in request",
+                           post: bool = False, data: dict = None, _json=None, raise_exception=False) -> dict:
         """
         dict response from web
 
         :return: json response from web
         :rtype: dict
         """
-        response = self._web_response(url, headers, expected_status, note, error_note, post=post, data=data,
-                                      _json=_json)
-        return response.json()
+        logging.info(msg=f'::getting response from url: {url}')
+        response = self._web_response(url=url, headers=headers, extra_headers=extra_headers,
+                                      expected_status=expected_status, note=note, error_note=error_note, post=post,
+                                      data=data, _json=_json, raise_exception=raise_exception)
+        logging.info(msg=f'::response status code: {response.status_code}')
+        logging.debug(msg=f'::response text: {response.text}')
+        return self.parse_json(response.text)
 
     @staticmethod
     def _parse_heading(soup: BeautifulSoup) -> str:
@@ -343,12 +357,11 @@ class CheggScraper:
             logging.info(msg=f"Heading: {heading}")
         return str(heading)
 
-    def _get_non_chapter_type_data(self, legacy_id: int, html_text: str) -> dict:
+    def _get_non_chapter_type_data(self, legacy_id: int, auth_token: str) -> dict:
         """
         Get non chapter type quetion and answer data from chegg api
         """
         logging.info(msg="Getting non chapter type data, legacy_id: {}".format(legacy_id))
-        token = re.search(r'"token":"(.+?)"', html_text).group(1)
 
         query = {
             "operationName": "QnaPageQuestionByLegacyId",
@@ -364,11 +377,14 @@ class CheggScraper:
         }
         graphql_url = 'https://gateway.chegg.com/one-graph/graphql'
 
-        headers = self.headers
-        headers['authorization'] = f'Basic {token}'
+        extra_headers = {
+            'authorization': f'Basic {auth_token}',
+            'content-type': 'application/json',
+            'apollographql-client-name': 'chegg-web',
+            'apollographql-client-version': 'main-127d14c8-2503803178'
+        }
 
-        res_data = self._get_response_dict(url=graphql_url, post=True, _json=query, headers=self.headers)
-        return res_data
+        return self._get_response_dict(url=graphql_url, post=True, _json=query, extra_headers=extra_headers)
 
     def _get_chapter_type_data(self, token: str, html_text: str) -> dict:
         chapter_id = str(re.search(r'\?id=(\d+).*?isbn', html_text).group(1))
@@ -390,14 +406,15 @@ class CheggScraper:
         res_data = self._get_response_dict(url=graphql_url, post=True, _json=query)
         return res_data
 
-    def _parse_question_answer(self, legacy_id: Optional[int], html_text: str, chapter_type: bool, token: str):
+    def _parse_question_answer(self, legacy_id: Optional[int], html_text: str, chapter_type: bool, token: Optional[str],
+                               auth_token: str):
         """
         Parse Question and Answers
         """
         if not chapter_type:
-            data = self._get_non_chapter_type_data(legacy_id, html_text)
+            data = self._get_non_chapter_type_data(legacy_id=legacy_id, auth_token=auth_token)
             question_div = data['data']['questionByLegacyId']['content']['body']
-            answer_divs = [answers_['answerData']['html'] for answers_ in
+            answer_divs = [f"<div class=\"answer-given-body ugc-base\">{answers_['answerData']['html']}</div>" for answers_ in
                            data['data']['questionByLegacyId']['htmlAnswers']]
             return question_div, '<ul class="answers-list">' + "".join(answer_divs) + "</ul>"
         else:
@@ -405,8 +422,8 @@ class CheggScraper:
                 self._get_chapter_type_data(token=token, html_text=html_text)
             )
 
-    def _parse(self, html_text: str, token: str, q_id: Optional[int], chapter_type: bool = None) -> (
-            str, str, str, str):
+    def _parse(self, html_text: str, token: Optional[str], q_id: Optional[int], auth_token: str,
+               chapter_type: bool = None) -> (str, str, str, str):
         html_text = self.replace_src_links(html_text)
         soup = BeautifulSoup(html_text, 'lxml')
         logging.debug("HTML\n\n" + html_text + "HTML\n\n")
@@ -426,11 +443,10 @@ class CheggScraper:
                 raise UnableToGetLegacyQuestionID
 
         question_div, answers_div = self._parse_question_answer(
-            legacy_id=q_id, html_text=html_text,
-            chapter_type=chapter_type, token=token
+            legacy_id=q_id, html_text=html_text, chapter_type=chapter_type, token=token, auth_token=auth_token
         )
 
-        return str(headers), heading, question_div, answers_div
+        return str(headers), heading, self.replace_src_links(question_div), self.replace_src_links(answers_div)
 
     def _save_html_file(self, rendered_html: str, heading: str = None, question_uuid: str = None,
                         file_name_format: str = None):
@@ -493,13 +509,23 @@ class CheggScraper:
         chapter_type, q_id, url = self.clean_url(url)
 
         html_res_text = self._get_response_text(url=url)
-        token = re.search(r'"token":"(.+?)"', html_res_text).group(1)
+        try:
+            token = re.search(r'"token":"(.+?)"', html_res_text).group(1)
+        except AttributeError:
+            token = None
+
+        if chapter_type and not token:
+            raise UnableToGetToken
+
+        # static
+        auth_token = "TnNZS3dJMGxMdVhBQWQwenFTMHFlak5UVXAwb1l1WDY6R09JZVdFRnVvNndRRFZ4Ug=="
 
         headers, heading, question_div, answers__ = self._parse(
             html_text=html_res_text,
             q_id=q_id,
             chapter_type=chapter_type,
-            token=token
+            token=token,
+            auth_token=auth_token
         )
 
         rendered_html = self._render_html(url, headers, heading, question_div, answers__)
