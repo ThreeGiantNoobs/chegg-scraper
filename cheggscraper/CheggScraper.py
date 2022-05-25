@@ -361,7 +361,11 @@ class CheggScraper:
             }
         }
         graphql_url = 'https://gateway.chegg.com/one-graph/graphql'
-        res_data = self._get_response_dict(url=graphql_url, post=True, _json=query)
+
+        headers = self.headers
+        headers['authorization'] = f'Basic {token}'
+
+        res_data = self._get_response_dict(url=graphql_url, post=True, _json=query, headers=self.headers)
         return res_data
 
     def _get_chapter_type_data(self, token: str, html_text: str) -> dict:
