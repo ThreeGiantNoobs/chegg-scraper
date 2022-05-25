@@ -217,7 +217,9 @@ class CheggScraper:
                     cookie_text = f.read()
                     json_result = CheggScraper.parse_json(cookie_text)
                     if json_result[0]:
+                        logging.debug(f'::cookie_path: {cookie_path} is json file')
                         return CheggScraper.dict_to_cookie_str(json_result[1]).strip()
+                    logging.debug(f'::cookie_path: {cookie_path} is not json file')
                     return cookie_text.strip()
             else:
                 logging.error(msg=f"{cookie_path} is not a file")
