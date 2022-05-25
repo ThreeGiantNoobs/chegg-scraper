@@ -405,7 +405,8 @@ class CheggScraper:
                 self._get_chapter_type_data(token=token, html_text=html_text)
             )
 
-    def _parse(self, html_text: str, token: str, q_id: Optional[int], chapter_type: bool = None) -> (str, str, str, str):
+    def _parse(self, html_text: str, token: str, q_id: Optional[int], chapter_type: bool = None) -> (
+            str, str, str, str):
         html_text = self.replace_src_links(html_text)
         soup = BeautifulSoup(html_text, 'lxml')
         logging.debug("HTML\n\n" + html_text + "HTML\n\n")
@@ -424,7 +425,10 @@ class CheggScraper:
             if not q_id:
                 raise UnableToGetLegacyQuestionID
 
-        question_div, answers_div = self._parse_question_answer(q_id, html_text, chapter_type, token=token)
+        question_div, answers_div = self._parse_question_answer(
+            legacy_id=q_id, html_text=html_text,
+            chapter_type=chapter_type, token=token
+        )
 
         return str(headers), heading, question_div, answers_div
 
@@ -489,12 +493,13 @@ class CheggScraper:
         chapter_type, q_id, url = self.clean_url(url)
 
         html_res_text = self._get_response_text(url=url)
+        token = re.search(r'"token":"(.+?)"', html_res_text).group(1)
 
         headers, heading, question_div, answers__ = self._parse(
             html_text=html_res_text,
             q_id=q_id,
             chapter_type=chapter_type,
-            token=None
+            token=token
         )
 
         rendered_html = self._render_html(url, headers, heading, question_div, answers__)
