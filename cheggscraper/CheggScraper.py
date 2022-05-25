@@ -339,13 +339,10 @@ class CheggScraper:
         @rtype: str
         """
         heading = None
-        heading_tag = soup.find('span', _class='question-text')
-        if heading_tag:
-            heading = heading_tag.text
-        if not heading:
-            meta_description = soup.find('meta', {'name': 'description'})
-            if meta_description:
-                heading = meta_description.get('content')
+        heading_data = soup.find('script', id='__NEXT_DATA__')
+        if heading_data:
+            heading_data = heading_data.text
+            heading = json.loads(heading_data)['query']['qnaSlug']
         if not heading:
             title = soup.find('title')
             if title:
