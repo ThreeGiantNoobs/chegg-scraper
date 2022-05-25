@@ -4,6 +4,8 @@ import os
 import random
 import re
 import string
+from typing import Union, Optional
+
 import unicodedata
 from importlib.resources import read_text
 
@@ -164,21 +166,21 @@ class CheggScraper:
         return ret
 
     @staticmethod
-    def parse_json(json_string: str) -> (bool, dict):
+    def parse_json(json_string: str) -> dict:
         """
         just parse json
 
         :param json_string: json data in format of string
         :type json_string: str
-        :return: tuple of isJson, dictionary form of json
-        :rtype:
+        :return: dict
+        :rtype: dict|None
         """
         try:
             data = json.loads(json_string)
-            return True, data
+            return data
         except Exception as e:
             logging.debug(msg=f'::while parsing json: {e}')
-            return False, None
+            raise JsonParseError
 
     @staticmethod
     def dict_to_cookie_str(cookie_dict: dict) -> str:
@@ -192,10 +194,10 @@ class CheggScraper:
         """
         cookie_str = ''
         first_flag = True
-        for cookie in cookie_dict:
+        for name, value in cookie_dict.items():
             if not first_flag:
                 cookie_str += '; '
-            cookie_str += '{name}={value}'.format(**cookie)
+            cookie_str += '{name}={value}'.format(name=name, value=value)
             first_flag = False
         return cookie_str
 
@@ -224,35 +226,29 @@ class CheggScraper:
         raise CookieFileDoesNotExist(cookie_path)
 
     @staticmethod
-    def clean_url(url: str) -> (bool, str):
+    def clean_url(url: str) -> (bool, Optional[int], str):
         """
         Cleans the url, So no track id goes to url
-
-        @param url: url of chegg webpage
-        @type url: str
-        @return: Url removed with trackId
-        @rtype: (bool, str)
         """
+        # https://www.chegg.com/homework-help/questions-and-answers/question--choose-random-questions-answer-possible-least-5-questions--thank-q8125333
         chapter_type = False
-        match = re.search(r'chegg\.com/homework-help/questions-and-answers/([^?/]+)', url)
+        q_id = None
+        match = re.search(r'chegg\.com/homework-help/questions-and-answers/([^ ?/\n]+)-q(\d+)', url)
         if not match:
             chapter_type = True
             match = re.search(r'chegg\.com/homework-help/[^?/]+', url)
             if not match:
                 logging.error(f'THIS URL NOT SUPPORTED\nurl: {url}')
                 raise UrlNotSupported(url)
+        else:
+            q_id = int(match.group(2))
 
-        return chapter_type, 'https://www.' + match.group(0)
+        return chapter_type, q_id, 'https://www.' + match.group(0)
 
     @staticmethod
     def final_touch(html_text: str) -> str:
         """
         Final changes to final html code, like changing class of some divs
-
-        @param html_text: html text
-        @type html_text: str
-        @return: modified FINAL html Text
-        @rtype: str
         """
         soup = BeautifulSoup(html_text, 'lxml')
         if soup.find('div', {'id': 'show-more'}):
@@ -266,10 +262,7 @@ class CheggScraper:
                       error_note: str = "Error in request", post: bool = False, data: dict = None,
                       _json=None) -> Response:
         """
-        Returns response
-
-        :return: return response from web
-        :rtype: Response
+        Returns response from web
         """
 
         if not headers:
@@ -302,6 +295,8 @@ class CheggScraper:
         :rtype: str
         """
         response = self._web_response(url, headers, expected_status, note, error_note)
+        if response.status_code not in expected_status:
+            raise Exception(f'Expected status code {expected_status} but got {response.status_code}\n{error_note}')
         return response.text
 
     def _get_response_dict(self, url: str, headers: dict = None, expected_status: tuple = (200,), note: str = None,
@@ -316,77 +311,6 @@ class CheggScraper:
         response = self._web_response(url, headers, expected_status, note, error_note, post=post, data=data,
                                       _json=_json)
         return response.json()
-
-    @staticmethod
-    def _parse_question(soup: BeautifulSoup) -> Tag:
-        """
-        Simply parse question
-
-
-        @param soup: BeautifulSoup from chegg_html
-        @type soup: BeautifulSoup
-        @return: div containing question
-        @rtype: Tag
-        """
-
-        return soup.find('div', {'class': 'question-body-text'})
-
-    def _parse_answer(self, soup: BeautifulSoup, question_uuid: str, html_text: str, url: str,
-                      chapter_type: bool = False) -> str:
-        """
-        Parse Answers as a div from soup
-
-        @param soup: BeautifulSoup from chegg_html
-        @type soup: BeautifulSoup
-        @param question_uuid: unique question id
-        @type question_uuid: str
-        @param html_text: chegg response text
-        @type html_text: str
-        @return: Div Containing div
-        @rtype: str
-        """
-        token = re.search(r'"token":"(.+?)"', html_text).group(1)
-
-        if chapter_type:
-            chapter_id = str(re.search(r'\?id=(\d+).*?isbn', html_text).group(1))
-            isbn13 = str(re.search(r'"isbn13":"(\d+)"', html_text).group(1))
-            problemId = str(re.search(r'"problemId":"(\d+)"', html_text).group(1))
-
-            query = {
-                "query": {
-                    "operationName": "getSolutionDetails",
-                    "variables": {
-                        "isbn13": isbn13,
-                        "chapterId": chapter_id,
-                        "problemId": problemId
-                    }
-                },
-                "token": token
-            }
-            graphql_url = 'https://www.chegg.com/study/_ajax/persistquerygraphql'
-
-            res_data = self._get_response_dict(url=graphql_url, post=True, _json=query)
-            return self.render_chapter_type_html(res_data)
-
-        to_load_enhanced_content = False
-        enhanced_content_div = soup.find('div', {'id': 'enhanced-content'})
-        if enhanced_content_div:
-            if enhanced_content_div.find('div', {'class': 'chg-load'}):
-                to_load_enhanced_content = True
-
-        answers_list_li = soup.findAll('div', {'class': 'answer-given-body'})
-        if answers_list_li:
-            _s_ = [str(x) for x in answers_list_li]
-            answers__ = '<ul class="answers-list">' + "".join(_s_) + "</ul>"
-        elif to_load_enhanced_content:
-            content_request_url = self.ajax_url.format(question_uuid=question_uuid, token=token,
-                                                       deviceFingerPrintId=self.deviceFingerPrintId)
-            answers__ = '<div id="enhanced-content"><hr>' + self._get_response_dict(url=content_request_url)[
-                'enhancedContentMarkup'] + "</div>"
-        else:
-            raise FailedToParseAnswer
-
-        return answers__
 
     @staticmethod
     def _parse_heading(soup: BeautifulSoup) -> str:
@@ -417,7 +341,65 @@ class CheggScraper:
             logging.info(msg=f"Heading: {heading}")
         return str(heading)
 
-    def _parse(self, html_text: str, url: str, chapter_type: bool = None) -> (str, str):
+    def _get_non_chapter_type_data(self, legacy_id: int, html_text: str) -> dict:
+        """
+        Get non chapter type quetion and answer data from chegg api
+        """
+        logging.info(msg="Getting non chapter type data, legacy_id: {}".format(legacy_id))
+        token = re.search(r'"token":"(.+?)"', html_text).group(1)
+
+        query = {
+            "operationName": "QnaPageQuestionByLegacyId",
+            "variables": {
+                "id": legacy_id
+            },
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "26efed323ef07d1759f67adadd2832ac85d7046b7eca681fe224d7824bab0928"
+                }
+            }
+        }
+        graphql_url = 'https://gateway.chegg.com/one-graph/graphql'
+        res_data = self._get_response_dict(url=graphql_url, post=True, _json=query)
+        return res_data
+
+    def _get_chapter_type_data(self, token: str, html_text: str) -> dict:
+        chapter_id = str(re.search(r'\?id=(\d+).*?isbn', html_text).group(1))
+        isbn13 = str(re.search(r'"isbn13":"(\d+)"', html_text).group(1))
+        problemId = str(re.search(r'"problemId":"(\d+)"', html_text).group(1))
+
+        query = {
+            "query": {
+                "operationName": "getSolutionDetails",
+                "variables": {
+                    "isbn13": isbn13,
+                    "chapterId": chapter_id,
+                    "problemId": problemId
+                }
+            },
+            "token": token
+        }
+        graphql_url = 'https://www.chegg.com/study/_ajax/persistquerygraphql'
+        res_data = self._get_response_dict(url=graphql_url, post=True, _json=query)
+        return res_data
+
+    def _parse_question_answer(self, legacy_id: Optional[int], html_text: str, chapter_type: bool, token: str):
+        """
+        Parse Question and Answers
+        """
+        if not chapter_type:
+            data = self._get_non_chapter_type_data(legacy_id, html_text)
+            question_div = data['data']['questionByLegacyId']['content']['body']
+            answer_divs = [answers_['answerData']['html'] for answers_ in
+                           data['data']['questionByLegacyId']['htmlAnswers']]
+            return question_div, '<ul class="answers-list">' + "".join(answer_divs) + "</ul>"
+        else:
+            return '<div></div>', self.render_chapter_type_html(
+                self._get_chapter_type_data(token=token, html_text=html_text)
+            )
+
+    def _parse(self, html_text: str, token: str, q_id: Optional[int], chapter_type: bool = None) -> (str, str):
         html_text = self.replace_src_links(html_text)
         soup = BeautifulSoup(html_text, 'lxml')
         logging.debug("HTML\n\n" + html_text + "HTML\n\n")
@@ -433,28 +415,12 @@ class CheggScraper:
 
         """Parse Question"""
         if not chapter_type:
-            _, question_data = self.parse_json(
-                re.search(r'C\.page\.homeworkhelp_question\((.*)?\);', html_text).group(1))
-        else:
-            _ = True
-            question_data = None
-        logging.debug(msg=str(question_data))
-        questionUuid = None
-        if _:
-            if not chapter_type:
-                questionUuid = question_data['question']['questionUuid']
-        else:
-            raise UnableToParseUUID
+            if not q_id:
+                raise UnableToGetLegacyQuestionID
 
-        if chapter_type:
-            question_div = '<div></div>'
-        else:
-            question_div = self._parse_question(soup)
+        question_div, answers_div = self._parse_question_answer(q_id, html_text, chapter_type, token=token)
 
-        """Parse Answer"""
-        answers_div = self._parse_answer(soup, questionUuid, html_text, url, chapter_type=chapter_type)
-
-        return headers, heading, question_div, answers_div, questionUuid
+        return headers, heading, question_div, answers_div
 
     def _save_html_file(self, rendered_html: str, heading: str = None, question_uuid: str = None,
                         file_name_format: str = None):
@@ -514,12 +480,16 @@ class CheggScraper:
         @return: file_path
         @rtype:
         """
-        chapter_type, url = self.clean_url(url)
+        chapter_type, q_id, url = self.clean_url(url)
 
         html_res_text = self._get_response_text(url=url)
 
-        headers, heading, question_div, answers__, question_uuid = self._parse(html_text=html_res_text,
-                                                                               chapter_type=chapter_type, url=url)
+        headers, heading, question_div, answers__, question_uuid = self._parse(
+            html_text=html_res_text,
+            url=url,
+            q_id=q_id,
+            chapter_type=chapter_type,
+        )
 
         rendered_html = self._render_html(url, headers, heading, question_div, answers__)
 

@@ -1,4 +1,3 @@
-
 class FailedToParse(Exception):
     def __init__(self):
         self.message = 'Failed to parse data'
@@ -9,9 +8,18 @@ class UnableToParseUUID(FailedToParse):
         self.message = 'Unable to get question uuid'
 
 
+class UnableToGetLegacyQuestionID(FailedToParse):
+    def __init__(self):
+        self.message = 'Unable to get question legacy id'
+
+
 class FailedToParseAnswer(FailedToParse):
     def __init__(self):
         self.message = 'Failed to parse answer'
+
+
+class JsonParseError(Exception):
+    ...
 
 
 class UrlNotSupported(ValueError):
