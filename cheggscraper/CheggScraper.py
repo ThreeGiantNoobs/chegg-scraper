@@ -384,7 +384,15 @@ class CheggScraper:
             'apollographql-client-version': 'main-127d14c8-2503803178'
         }
 
-        return self._get_response_dict(url=graphql_url, post=True, _json=query, extra_headers=extra_headers)
+        data = self._get_response_dict(url=graphql_url, post=True, _json=query, extra_headers=extra_headers)
+        if data['errors']:
+            logging.error(msg=f"Error in getting non chapter type data, legacy_id: {legacy_id}")
+            logging.error(msg=f"Error: {data['errors']['message']}")
+            if (restrictions := data['errors']['message'].get('extensions', {}).get('metadata', {}).get(
+                    'accessRestrictions')) and 'DEVICE_ALLOWED_QUOTA_EXCEEDED' in restrictions:
+                raise DeviceAllowedQuotaExceeded
+
+        return data
 
     def _get_chapter_type_data(self, token: str, html_text: str) -> dict:
         chapter_id = str(re.search(r'\?id=(\d+).*?isbn', html_text).group(1))
@@ -414,7 +422,8 @@ class CheggScraper:
         if not chapter_type:
             data = self._get_non_chapter_type_data(legacy_id=legacy_id, auth_token=auth_token)
             question_div = data['data']['questionByLegacyId']['content']['body']
-            answer_divs = [f"<div class=\"answer-given-body ugc-base\">{answers_['answerData']['html']}</div>" for answers_ in
+            answer_divs = [f"<div class=\"answer-given-body ugc-base\">{answers_['answerData']['html']}</div>" for
+                           answers_ in
                            data['data']['questionByLegacyId']['htmlAnswers']]
             return question_div, '<ul class="answers-list">' + "".join(answer_divs) + "</ul>"
         else:

@@ -37,6 +37,11 @@ class UrlNotSupported(ValueError):
         self.message = f'URL NOT SUPPORTED: {url}'
 
 
+class DeviceAllowedQuotaExceeded(Exception):
+    def __init__(self):
+        self.message = 'Device allowed quota exceeded'
+
+
 class CookieFileDoesNotExist(FileNotFoundError):
     def __init__(self, path):
         self.message = f'File does not exist: {path}'
