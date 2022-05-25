@@ -403,7 +403,7 @@ class CheggScraper:
                 self._get_chapter_type_data(token=token, html_text=html_text)
             )
 
-    def _parse(self, html_text: str, token: str, q_id: Optional[int], chapter_type: bool = None) -> (str, str):
+    def _parse(self, html_text: str, token: str, q_id: Optional[int], chapter_type: bool = None) -> (str, str, str, str):
         html_text = self.replace_src_links(html_text)
         soup = BeautifulSoup(html_text, 'lxml')
         logging.debug("HTML\n\n" + html_text + "HTML\n\n")
@@ -424,7 +424,7 @@ class CheggScraper:
 
         question_div, answers_div = self._parse_question_answer(q_id, html_text, chapter_type, token=token)
 
-        return headers, heading, question_div, answers_div
+        return str(headers), heading, question_div, answers_div
 
     def _save_html_file(self, rendered_html: str, heading: str = None, question_uuid: str = None,
                         file_name_format: str = None):
@@ -488,16 +488,16 @@ class CheggScraper:
 
         html_res_text = self._get_response_text(url=url)
 
-        headers, heading, question_div, answers__, question_uuid = self._parse(
+        headers, heading, question_div, answers__ = self._parse(
             html_text=html_res_text,
-            url=url,
             q_id=q_id,
             chapter_type=chapter_type,
+            token=None
         )
 
         rendered_html = self._render_html(url, headers, heading, question_div, answers__)
 
-        file_path = self._save_html_file(rendered_html, heading, question_uuid, file_name_format)
+        file_path = self._save_html_file(rendered_html, heading, None, file_name_format)
 
         if get_dict_info:
             return file_path, url, headers, heading, question_div, answers__
