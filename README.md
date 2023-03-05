@@ -1,3 +1,9 @@
+## NOTE
+### The Original Developers are no longer in a position to maintain this project. But we would still like to keep the project alive, thus any open source contribution from the community is more than welcome.
+
+
+<br>
+
 # Chegg-Scrapper
 
 
